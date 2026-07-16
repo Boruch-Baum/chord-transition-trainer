@@ -1,0 +1,91 @@
+name: Build Debian Package
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-debian:
+    runs-on: ubuntu-latest
+
+    env:
+      # Debian rejects underscores in package names
+      #                and version numbers
+      APP_NAME: chord-transition-trainer
+      MAIN_PY: chord-transition-trainer.py
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set current date
+        run: |
+          now_date="$(date +'%F-%H%M%S')"
+          case "{GITHUB_REF_NAME}" in
+          [0-9]*) version="${GITHUB_REF_NAME}-${now_date}"
+                  ;;
+          *)      version="0.0-${now_date}"
+                  ;;
+          esac
+          echo "VERSION=${version}" >> $GITHUB_ENV
+
+#     - name: Debug
+#       run: |
+#         echo "VERSION: ${GITHUB_REF_NAME}"
+#         echo "VERSION: ${{ env.VERSION }}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            python3 python3-pip python3-venv \
+            build-essential debhelper dh-make fakeroot
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then python3 -m pip install -r requirements.txt; fi
+          python3 -m pip install pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller --windowed --onefile --name "$APP_NAME" "$MAIN_PY"
+
+      - name: Prepare package tree
+        run: |
+          mkdir -p "pkg/DEBIAN"
+          mkdir -p "pkg/usr/bin"
+          mkdir -p "pkg/usr/share/applications"
+          mkdir -p "pkg/usr/share/pixmaps"
+
+          cp "dist/$APP_NAME" "pkg/usr/bin/$APP_NAME"
+          chmod 755 "pkg/usr/bin/$APP_NAME"
+          cp "assets/$APP_NAME.desktop" "pkg/usr/share/applications/$APP_NAME.desktop"
+          cp "assets/$APP_NAME.svg" "pkg/usr/share/pixmaps/$APP_NAME.svg"
+
+          cat > "pkg/DEBIAN/control" <<EOF
+          Package: $APP_NAME
+          Version: ${{ env.VERSION }}
+          Section: misc
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Boruch Baum <boruch_baum@gmx.com>
+          Depends: python3
+          Description: Chord Transition Trainer
+           A Qt-based chord transition speed trainer application for music \
+           students and musicians.
+          EOF
+
+      - name: Build .deb
+        run: |
+          fakeroot dpkg-deb --build pkg "${APP_NAME}_${{ env.VERSION }}_amd64.deb"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-debian
+          path: "*.deb"
