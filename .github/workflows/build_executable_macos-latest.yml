@@ -1,0 +1,41 @@
+name: Build Executable MacOs-latest
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-native:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+
+    env:
+      APP_NAME: chord-transition-trainer
+      MAIN_PY: chord-transition-trainer.py
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # github workflows not yet supporting python 3.16
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then python3 -m pip install -r requirements.txt; fi
+          python3 -m pip install pyinstaller
+
+      - name: Build (native runner)
+        run: |
+          pyinstaller --windowed --onefile --name "$APP_NAME" "$MAIN_PY"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-${{ runner.os }}
+          path: dist/

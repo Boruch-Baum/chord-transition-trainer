@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Chord Transition Trainer
+Exec=chord-transition-trainer
+Icon=chord-transition-trainer
+Categories=Music;Education;
+Terminal=false

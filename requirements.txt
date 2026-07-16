@@ -1,0 +1,2 @@
+playsound3
+pyside6

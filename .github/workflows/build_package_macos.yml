@@ -1,0 +1,41 @@
+name: Build macOS App
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    env:
+      APP_NAME: chord-transition-trainer
+      MAIN_PY:  chord-transition-trainer.py
+      APP_ICON: assets/icon.icns
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+          python -m pip install pyinstaller
+
+      - name: Build app bundle
+        shell: bash
+        run: |
+          pyinstaller --windowed --icon "$APP_ICON" --name "$APP_NAME" "$MAIN_PY"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-macos
+          path: dist/

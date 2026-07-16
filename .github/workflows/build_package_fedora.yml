@@ -1,0 +1,98 @@
+name: Build Fedora RPM
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-fedora:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_NAME: chord-transition-trainer
+      MAIN_PY: chord-transition-trainer.py
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build in Fedora container
+        run: |
+          docker run --rm \
+            -v "$PWD":/src \
+            -w /src \
+            -e APP_NAME="${APP_NAME}" \
+            -e MAIN_PY="${MAIN_PY}" \
+            -e VERSION="${GITHUB_REF_NAME#v}" \
+            fedora:latest \
+            /bin/bash -s <<'EOF'
+          set -e
+
+          dnf install -y \
+            python3 python3-pip python3-devel \
+            gcc rpm-build rpmdevtools \
+            desktop-file-utils
+
+          python3 -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            python3 -m pip install -r requirements.txt
+          fi
+          python3 -m pip install pyinstaller
+
+          pyinstaller --windowed --onefile --name "$APP_NAME" "$MAIN_PY"
+
+          rpmdev-setuptree
+
+          mkdir -p "$HOME/rpmbuild/SOURCES"
+          mkdir -p "$HOME/rpmbuild/SPECS"
+
+          tar -czf "$HOME/rpmbuild/SOURCES/$APP_NAME-$VERSION.tar.gz" \
+            -C dist "$APP_NAME"
+
+          cat > "$HOME/rpmbuild/SPECS/$APP_NAME.spec" <<SPEC
+          Name:           $APP_NAME
+          Version:        $VERSION
+          Release:        1%{?dist}
+          Summary:        Chord Transition Trainer
+          License:        Proprietary
+          URL:            https://github.com/${GITHUB_REPOSITORY}
+          Source0:        %{name}-%{version}.tar.gz
+          BuildArch:      x86_64
+          BuildRequires:  python3-devel
+
+          %description
+          A Qt-based music education application for practicing chord transitions.
+
+          %prep
+          %autosetup -n %{name}-%{version}
+
+          %build
+          # No build step needed; PyInstaller output is already produced.
+
+          %install
+          mkdir -p %{buildroot}/usr/bin
+          mkdir -p %{buildroot}/usr/share/applications
+          mkdir -p %{buildroot}/usr/share/pixmaps
+
+          install -m 0755 %{_builddir}/%{name}-%{version}/$APP_NAME %{buildroot}/usr/bin/$APP_NAME
+          install -m 0644 /src/assets/$APP_NAME.desktop %{buildroot}/usr/share/applications/$APP_NAME.desktop
+          install -m 0644 /src/assets/$APP_NAME.svg %{buildroot}/usr/share/pixmaps/$APP_NAME.svg
+
+          %files
+          /usr/bin/$APP_NAME
+          /usr/share/applications/$APP_NAME.desktop
+          /usr/share/pixmaps/$APP_NAME.svg
+
+          %changelog
+          * Thu Jan 01 2026 Your Name <you@example.com> - $VERSION-1
+          - Initial RPM package
+          SPEC
+
+          rpmbuild -bb "$HOME/rpmbuild/SPECS/$APP_NAME.spec" --define "_topdir $HOME/rpmbuild"
+          EOF
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-fedora
+          path: /home/runner/rpmbuild/RPMS/**/*.rpm
