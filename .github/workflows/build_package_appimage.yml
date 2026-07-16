@@ -1,0 +1,83 @@
+name: Build AppImage
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-appimage:
+    runs-on: ubuntu-latest
+
+    # 2026-07: The container is necessary because
+    # linuxdeployqt.AppImage checks that the build environment uses a
+    # glibc version "no newer than what comes with the oldest currently
+    # supported mainstream distribution", currently glibc 2.35.
+    container:
+      image: ubuntu:22.04
+
+    env:
+      APP_NAME: chord-transition-trainer
+      APPIMAGE_NAME: Chord_Transition_Trainer
+      MAIN_PY: chord-transition-trainer.py
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        # 2026-07: Unlike other workflows, this one uses an older
+        # version of python, in order to be compatible with the glibc
+        # 2.35 requirement discussed above.
+        with:
+          python-version: "3.10.6"
+
+      - name: Install build dependencies
+        run: |
+          apt-get update && \
+          apt-get install -y \
+            python3 python3-pip python3-venv build-essential \
+            desktop-file-utils fuse libfuse2 curl file
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then python3 -m pip install -r requirements.txt; fi
+          python3 -m pip install pyinstaller
+
+      - name: Build app
+        run: |
+          pyinstaller --windowed --onefile --name "$APP_NAME" "$MAIN_PY"
+
+      - name: Prepare AppDir
+        run: |
+          # TODO: If we later need launch-time setup, add AppRun at AppDir/AppRun.
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/scalable/apps
+          cp "dist/$APP_NAME" "AppDir/usr/bin/$APP_NAME"
+          chmod +x "AppDir/usr/bin/$APP_NAME"
+          cp "assets/$APP_NAME.desktop" "AppDir/usr/share/applications/$APP_NAME.desktop"
+          cp "assets/$APP_NAME.svg" "AppDir/usr/share/icons/hicolor/scalable/apps/$APP_NAME.svg"
+          # Optional: place the icon at the AppDir root
+          cp "assets/$APP_NAME.svg" "AppDir/$APP_NAME.svg"
+
+      - name: Download linuxdeployqt
+        run: |
+          curl -L -o linuxdeployqt.AppImage \
+            https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+          chmod +x linuxdeployqt.AppImage
+
+      - name: Build AppImage
+        run: |
+          export VERSION="${GITHUB_REF_NAME#v}"
+          ./linuxdeployqt.AppImage --appimage-extract-and-run \
+            AppDir/usr/share/applications/$APP_NAME.desktop \
+            -appimage \
+            -bundle-non-qt-libs
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-appimage
+          path: "${{ env.APPIMAGE_NAME }}*.AppImage"

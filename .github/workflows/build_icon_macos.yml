@@ -1,0 +1,36 @@
+name: Build macOS Icon
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-icon:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_NAME: chord-transition-trainer
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Generate macOS icon
+        shell: bash
+        run: |
+          npm install -g svg-app-icon
+          mkdir -p assets
+          npx svg-app-icon --include icns --destination assets < "assets/$APP_NAME.svg"
+          ls -la
+        # ls -la is a debugging line to verify what output was created
+
+      - name: Upload icon artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-icon
+          path: assets/*.icns

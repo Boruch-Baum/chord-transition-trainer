@@ -1,0 +1,14 @@
+name: Build Executables
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-executable-ubuntu:
+    uses: ./.github/workflows/build_executable_ubuntu-latest.yml
+  build-executable-windows:
+    uses: ./.github/workflows/build_executable_windows-latest.yml
+  build-executable-macos:
+    uses: ./.github/workflows/build_executable_macos-latest.yml
+  build-executable-other_linuxes:
+    uses: ./.github/workflows/build_executable_other_linuxes.yml
