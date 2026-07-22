@@ -22,17 +22,17 @@ jobs:
         run: |
           now_date="$(date +'%F-%H%M%S')"
           case "{GITHUB_REF_NAME}" in
-          [0-9]*) version="${GITHUB_REF_NAME}-${now_date}"
+          [0-9]*) version="${GITHUB_REF_NAME}"
                   ;;
           *)      version="0.0-${now_date}"
                   ;;
           esac
           echo "VERSION=${version}" >> $GITHUB_ENV
 
-#     - name: Debug
-#       run: |
-#         echo "VERSION: ${GITHUB_REF_NAME}"
-#         echo "VERSION: ${{ env.VERSION }}"
+      - name: Debug
+        run: |
+          echo "VERSION: ${GITHUB_REF_NAME}"
+          echo "VERSION: ${{ env.VERSION }}"
 
       - name: Set up Python
         uses: actions/setup-python@v5
