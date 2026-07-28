@@ -787,7 +787,9 @@ class MainWindow(QWidget):
         Dynamically resize window so chord text doesn't wrap or hide.
         """
         metrics = self.chord_transition_text.fontMetrics()
-        top_two = sorted(self.chord_list, key=metrics.horizontalAdvance, reverse=True)[:2]
+        top_two = sorted(list(dict.fromkeys(self.chord_list)),
+                         key=metrics.horizontalAdvance,
+                         reverse=True)[:2]
         if len(top_two) < 2:
             return
         needed_width = 100 + metrics.horizontalAdvance(
